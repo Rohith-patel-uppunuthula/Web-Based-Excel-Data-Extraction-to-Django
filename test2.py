@@ -6,13 +6,8 @@ output_dir = Path("extracted_growth_equity")
 output_dir.mkdir(exist_ok=True)
 
 # flexible keywords
-START_KEYWORDS = [
-    "growth", "equity", "oriented"
-]
-
-END_KEYWORDS = [
-    "sub total", "subtotal", "sub-total"
-]
+START_KEYWORDS = ["growth", "equity", "oriented"]
+END_KEYWORDS = ["sub total", "subtotal", "sub-total"]
 
 for file in input_dir.iterdir():
     if file.suffix not in [".xls", ".xlsx"]:
@@ -20,18 +15,17 @@ for file in input_dir.iterdir():
 
     print(f"Processing {file.name}")
 
-    # choose engine based on file type
-    engine = "xlrd" if file.suffix == ".xls" else "openpyxl"
-
+    # -------- AUTO-DETECT EXCEL FORMAT --------
     try:
-        df = pd.read_excel(
-            file,
-            header=None,
-            engine=engine
-        )
-    except Exception as e:
-        print(f"❌ Failed to read {file.name}: {e}")
-        continue
+        # Try XLSX first (many .xls files are actually xlsx)
+        df = pd.read_excel(file, header=None, engine="openpyxl")
+    except Exception:
+        try:
+            # Fallback to true XLS
+            df = pd.read_excel(file, header=None, engine="xlrd")
+        except Exception as e:
+            print(f"❌ Failed to read {file.name}: {e}")
+            continue
 
     df = df.astype(str)
 
@@ -45,7 +39,7 @@ for file in input_dir.iterdir():
 
     # -------- FIND END ROW (LOOSE MATCH) --------
     end_idx = None
-    for i in range(start_idx + 1 if start_idx else 0, len(df)):
+    for i in range(start_idx + 1 if start_idx is not None else 0, len(df)):
         row_text = " ".join(df.iloc[i]).lower()
         if any(k in row_text for k in END_KEYWORDS):
             end_idx = i
