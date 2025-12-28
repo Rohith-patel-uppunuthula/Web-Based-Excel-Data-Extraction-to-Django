@@ -23,11 +23,11 @@ for month in MONTHS:
         if r.status_code == 200 and r.content:
             with open(file_path, "wb") as f:
                 f.write(r.content)
-            print(f"✅ Downloaded: {filename}")
+            print(f" Downloaded: {filename}")
         else:
-            print(f"❌ Not available: {filename}")
+            print(f" Not available: {filename}")
 
     except requests.exceptions.RequestException as e:
-        print(f"⚠️ Error: {e}")
+        print(f"Error: {e}")
 
 print("Done.")

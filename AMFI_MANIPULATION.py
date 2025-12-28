@@ -24,7 +24,7 @@ for file in input_dir.iterdir():
             # Fallback to true XLS
             df = pd.read_excel(file, header=None, engine="xlrd")
         except Exception as e:
-            print(f"❌ Failed to read {file.name}: {e}")
+            print(f" Failed to read {file.name}: {e}")
             continue
 
     df = df.astype(str)
@@ -46,7 +46,7 @@ for file in input_dir.iterdir():
             break
 
     if start_idx is None or end_idx is None:
-        print(f"⚠️ Section not found in {file.name}")
+        print(f" Section not found in {file.name}")
         continue
 
     # slice section
@@ -56,6 +56,6 @@ for file in input_dir.iterdir():
     output_file = output_dir / f"{file.stem}_growth_equity.xlsx"
     section_df.to_excel(output_file, index=False, header=False)
 
-    print(f"✅ Saved → {output_file.name}")
+    print(f"Saved → {output_file.name}")
 
 print("\nAll files processed.")
