@@ -1,0 +1,18 @@
+# OS / installers
+*.deb
+
+# Virtual environments
+env/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Generated files
+*.xlsx
+*.xls
+
+# Selenium / downloads
+amfi_downloads/
+extracted_growth_equity/
