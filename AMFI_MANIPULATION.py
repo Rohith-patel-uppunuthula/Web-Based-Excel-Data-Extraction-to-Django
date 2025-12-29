@@ -1,61 +1,125 @@
 import pandas as pd
 from pathlib import Path
 
+# ==========================
+# CONFIG
+# ==========================
 input_dir = Path("amfi_downloads")
 output_dir = Path("extracted_growth_equity")
 output_dir.mkdir(exist_ok=True)
 
-# flexible keywords
 START_KEYWORDS = ["growth", "equity", "oriented"]
 END_KEYWORDS = ["sub total", "subtotal", "sub-total"]
 
+HEADER_KEYWORDS = [
+    "scheme", "schemes",
+    "net", "assets",
+    "aum",
+    "rs.", "₹"
+]
+
+# ==========================
+# PROCESS FILES
+# ==========================
 for file in input_dir.iterdir():
     if file.suffix not in [".xls", ".xlsx"]:
         continue
 
-    print(f"Processing {file.name}")
+    print(f"\nProcessing {file.name}")
 
-    # -------- AUTO-DETECT EXCEL FORMAT --------
+    # --------------------------
+    # READ EXCEL (robust)
+    # --------------------------
     try:
-        # Try XLSX first (many .xls files are actually xlsx)
-        df = pd.read_excel(file, header=None, engine="openpyxl")
+        df_raw = pd.read_excel(file, header=None, engine="openpyxl")
     except Exception:
         try:
-            # Fallback to true XLS
-            df = pd.read_excel(file, header=None, engine="xlrd")
+            df_raw = pd.read_excel(file, header=None, engine="xlrd")
         except Exception as e:
-            print(f" Failed to read {file.name}: {e}")
+            print(f"  ❌ Failed to read file: {e}")
             continue
 
-    df = df.astype(str)
+    df_raw = df_raw.astype(str)
 
-    # -------- FIND START ROW (LOOSE MATCH) --------
-    start_idx = None
-    for i, row in df.iterrows():
+    # --------------------------
+    # DETECT HEADER ROW
+    # --------------------------
+    header_row = None
+    for i, row in df_raw.iterrows():
         row_text = " ".join(row).lower()
-        if all(k in row_text for k in START_KEYWORDS):
+        if any(k in row_text for k in HEADER_KEYWORDS):
+            header_row = i
+            break
+
+    if header_row is None:
+        print("  ❌ Header row not found")
+        continue
+
+    # --------------------------
+    # FIX HEADERS
+    # --------------------------
+    df = df_raw.copy()
+    df.columns = df.iloc[header_row]
+    df = df.iloc[header_row + 1:].reset_index(drop=True)
+
+    # remove junk columns
+    df = df.loc[:, df.columns.notna()]
+    df = df.loc[:, ~df.columns.astype(str).str.contains("nan", case=False)]
+
+    df_str = df.astype(str)
+
+    # --------------------------
+    # FIND START ROW
+    # --------------------------
+    start_idx = None
+    for i, row in df_str.iterrows():
+        if all(k in " ".join(row).lower() for k in START_KEYWORDS):
             start_idx = i
             break
 
-    # -------- FIND END ROW (LOOSE MATCH) --------
+    # --------------------------
+    # FIND END ROW
+    # --------------------------
     end_idx = None
     for i in range(start_idx + 1 if start_idx is not None else 0, len(df)):
-        row_text = " ".join(df.iloc[i]).lower()
-        if any(k in row_text for k in END_KEYWORDS):
+        if any(k in " ".join(df_str.iloc[i]).lower() for k in END_KEYWORDS):
             end_idx = i
             break
 
     if start_idx is None or end_idx is None:
-        print(f" Section not found in {file.name}")
+        print("  ❌ Growth / Equity section not found")
         continue
 
-    # slice section
-    section_df = df.loc[start_idx:end_idx].reset_index(drop=True)
+    # --------------------------
+    # SLICE SECTION
+    # --------------------------
+    section_df = df.iloc[start_idx:end_idx + 1].copy()
 
-    # save
+    # --------------------------
+    # REMOVE CATEGORY HEADER ROWS
+    # --------------------------
+    numeric_cols = [
+        col for col in section_df.columns
+        if col not in ["Sr", "Scheme Name"]
+    ]
+
+    section_df = section_df.dropna(
+        subset=numeric_cols,
+        how="all"
+    )
+
+    # --------------------------
+    # FINAL CLEANUP
+    # --------------------------
+    section_df = section_df.loc[:, section_df.columns.notna()]
+    section_df = section_df.reset_index(drop=True)
+
+    # --------------------------
+    # SAVE
+    # --------------------------
     output_file = output_dir / f"{file.stem}_growth_equity.xlsx"
-    section_df.to_excel(output_file, index=False, header=False)
+    section_df.to_excel(output_file, index=False)
 
-    print(f"Saved → {output_file.name}")
+    print(f"  ✅ Saved → {output_file.name}")
 
-print("\nAll files processed.")
+print("\n🎯 All files processed successfully.")
