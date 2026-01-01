@@ -16,7 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from market_data.views import amfi_monthly_summary_api, amfi_compare_api
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path("admin/", admin.site.urls),
+    path("api/amfi/summary/", amfi_monthly_summary_api),
+    path("api/amfi/compare/", amfi_compare_api),
+
 ]
