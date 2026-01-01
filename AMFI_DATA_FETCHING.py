@@ -1,6 +1,7 @@
 import requests
 from pathlib import Path
 
+
 BASE_URL = "https://portal.amfiindia.com/spages"
 YEAR = 2025
 MONTHS = [

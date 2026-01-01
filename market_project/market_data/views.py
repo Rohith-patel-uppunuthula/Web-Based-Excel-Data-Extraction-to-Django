@@ -1,8 +1,13 @@
 from django.http import JsonResponse
-from market_data.services.amfi_analytics import monthly_amfi_summary
+from market_data.services.amfi_analytics import (
+    monthly_amfi_summary,
+    compare_two_months
+)
+
 
 def amfi_monthly_summary_api(request):
     month = request.GET.get("month")
+
     if not month:
         return JsonResponse(
             {"error": "month query param is required"},
@@ -12,8 +17,6 @@ def amfi_monthly_summary_api(request):
     data = monthly_amfi_summary(month)
     return JsonResponse(data)
 
-
-from market_data.services.amfi_analytics import compare_two_months
 
 def amfi_compare_api(request):
     month_a = request.GET.get("from")

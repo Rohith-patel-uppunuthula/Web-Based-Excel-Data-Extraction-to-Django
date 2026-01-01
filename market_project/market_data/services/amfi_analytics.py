@@ -1,5 +1,10 @@
-from market_data.models import AmfiMonthlyData
 from django.db.models import Sum
+from market_data.models import AmfiMonthlyData
+
+
+# ======================================================
+# CONFIG
+# ======================================================
 
 LARGE_MIDCAP_BUCKET = [
     "Large Cap Fund",
@@ -13,7 +18,17 @@ LARGE_MIDCAP_BUCKET = [
     "Sectoral/Thematic Funds",
 ]
 
+
+# ======================================================
+# 1️⃣ MONTHLY SUMMARY (Single Month KPIs)
+# ======================================================
+
 def monthly_amfi_summary(month: str):
+    """
+    Returns Small Cap and Large+Mid Cap summary for a given month
+    Used for KPI cards and base analytics
+    """
+
     qs = AmfiMonthlyData.objects.filter(month=month)
 
     small_cap = qs.filter(
@@ -30,7 +45,23 @@ def monthly_amfi_summary(month: str):
         "large_midcap": round(large_midcap, 2),
     }
 
+
+# ======================================================
+# 2️⃣ MONTH-TO-MONTH COMPARISON
+# ======================================================
+
 def compare_two_months(month_a: str, month_b: str):
+    """
+    Compares two months and returns net change
+    Used for MoM growth / decline indicators
+    """
+
+    if not AmfiMonthlyData.objects.filter(month=month_a).exists():
+        return {"error": f"No data for {month_a}"}
+
+    if not AmfiMonthlyData.objects.filter(month=month_b).exists():
+        return {"error": f"No data for {month_b}"}
+
     a = monthly_amfi_summary(month_a)
     b = monthly_amfi_summary(month_b)
 
@@ -39,4 +70,37 @@ def compare_two_months(month_a: str, month_b: str):
         "month_b": month_b,
         "small_cap_change": round(b["small_cap"] - a["small_cap"], 2),
         "large_midcap_change": round(b["large_midcap"] - a["large_midcap"], 2),
+    }
+
+
+# ======================================================
+# 3️⃣ YEAR-WISE PIVOT (Month × Category Matrix)
+# ======================================================
+
+def amfi_year_pivot(year: str):
+    """
+    Returns category-wise monthly matrix for a given year
+    Used for pivot table UI
+    """
+
+    qs = AmfiMonthlyData.objects.filter(month__endswith=year)
+
+    months = sorted(
+        qs.values_list("month", flat=True).distinct()
+    )
+
+    categories = sorted(
+        qs.values_list("scheme_category", flat=True).distinct()
+    )
+
+    matrix = {month: {} for month in months}
+
+    for row in qs:
+        matrix[row.month][row.scheme_category] = row.net_inflow
+
+    return {
+        "year": year,
+        "months": months,
+        "categories": categories,
+        "matrix": matrix,
     }
