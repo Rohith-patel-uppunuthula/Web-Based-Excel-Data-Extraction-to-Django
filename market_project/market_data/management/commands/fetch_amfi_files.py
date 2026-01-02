@@ -5,9 +5,11 @@ from django.core.management.base import BaseCommand
 from datetime import datetime
 from market_data.models import AmfiMonthlyData
 
-# =========================
+
+# ======================================================
 # CONFIG
-# =========================
+# ======================================================
+
 BASE_URL = "https://portal.amfiindia.com/spages"
 
 DOWNLOAD_DIR = Path("amfi_downloads")
@@ -18,10 +20,29 @@ MONTHS = [
     "jul", "aug", "sep", "oct", "nov", "dec"
 ]
 
+MONTH_MAP = {
+    "jan": "January",
+    "feb": "February",
+    "mar": "March",
+    "apr": "April",
+    "may": "May",
+    "jun": "June",
+    "jul": "July",
+    "aug": "August",
+    "sep": "September",
+    "oct": "October",
+    "nov": "November",
+    "dec": "December",
+}
+
 START_KEYWORDS = ["growth", "equity", "oriented"]
 END_KEYWORDS = ["sub total", "subtotal", "sub-total"]
 HEADER_KEYWORDS = ["scheme", "net", "assets", "aum", "rs.", "₹"]
 
+
+# ======================================================
+# COMMAND
+# ======================================================
 
 class Command(BaseCommand):
     help = "AMFI full pipeline: download → extract → store in DB"
@@ -34,11 +55,14 @@ class Command(BaseCommand):
 
         for year in range(current_year, current_year - 5, -1):
             for month in MONTHS:
+
                 filename = f"am{month}{year}repo.xls"
                 file_path = DOWNLOAD_DIR / filename
                 url = f"{BASE_URL}/{filename}"
 
-                # ---------------- DOWNLOAD ----------------
+                # =========================
+                # DOWNLOAD
+                # =========================
                 if not file_path.exists():
                     try:
                         r = requests.get(url, timeout=30)
@@ -50,7 +74,9 @@ class Command(BaseCommand):
                     except requests.exceptions.RequestException:
                         continue
 
-                # ---------------- READ EXCEL ----------------
+                # =========================
+                # READ EXCEL
+                # =========================
                 try:
                     df_raw = pd.read_excel(file_path, header=None)
                 except Exception:
@@ -58,7 +84,9 @@ class Command(BaseCommand):
 
                 df_raw = df_raw.astype(str)
 
-                # ---------------- FIND HEADER ----------------
+                # =========================
+                # FIND HEADER ROW
+                # =========================
                 header_row = None
                 for i, row in df_raw.iterrows():
                     if any(k in " ".join(row).lower() for k in HEADER_KEYWORDS):
@@ -74,7 +102,9 @@ class Command(BaseCommand):
                 df = df.loc[:, df.columns.notna()]
                 df_str = df.astype(str)
 
-                # ---------------- FIND SECTION ----------------
+                # =========================
+                # FIND GROWTH / EQUITY SECTION
+                # =========================
                 start_idx, end_idx = None, None
 
                 for i, row in df_str.iterrows():
@@ -94,15 +124,18 @@ class Command(BaseCommand):
                 section_df = df.iloc[start_idx:end_idx].copy()
                 section_df = section_df.dropna(how="all").reset_index(drop=True)
 
-                # ---------------- STORE INTO DB ----------------
-                month_label = f"{month.capitalize()} {year}"
+                # =========================
+                # STORE INTO DB
+                # =========================
+                month_label = f"{MONTH_MAP[month]} {year}"
 
                 for _, row in section_df.iterrows():
                     scheme = str(row.iloc[1]).strip()
                     net_inflow = row.iloc[6]
 
                     if (
-                        "sub total" in scheme.lower()
+                        not scheme
+                        or "sub total" in scheme.lower()
                         or "growth/equity" in scheme.lower()
                         or pd.isna(net_inflow)
                     ):
@@ -119,4 +152,6 @@ class Command(BaseCommand):
                         defaults={"net_inflow": net_inflow},
                     )
 
-        self.stdout.write(self.style.SUCCESS("🎯 AMFI DOWNLOAD → DB PIPELINE COMPLETE"))
+        self.stdout.write(
+            self.style.SUCCESS("🎯 AMFI DOWNLOAD → EXTRACT → DB PIPELINE COMPLETE")
+        )
